@@ -5,11 +5,11 @@
 services:
   # Kutt 主应用服务
   server:
-    container_name: kutt-server
-    # 使用官方 Docker 镜像，自动获取最新稳定版本
-    image: kutt/kutt:latest
+    container_name: ${KUTT_CONTAINER_NAME}               # 容器名称（从 .env 读取）
+    # 使用官方 Docker 镜像，版本可在 .env 中配置
+    image: ${KUTT_IMAGE}                                 # 镜像名称（从 .env 读取）
     # 容器异常退出时自动重启
-    restart: always
+    restart: ${RESTART_POLICY}                           # 重启策略（从 .env 读取）
     # 数据卷挂载 - 持久化自定义文件
     volumes:
       # 自定义主题、样式、图片等文件的持久化存储
@@ -17,34 +17,34 @@ services:
     # 环境变量配置
     environment:
         # === 数据库配置 ===
-        DB_CLIENT: pg                                    # 数据库客户端类型：PostgreSQL
-        DB_HOST: postgres                                # 数据库主机名（容器名）
-        DB_PORT: 5432                                    # 数据库端口
-        DB_NAME: ${DB_NAME}                              # 数据库名称（从 .env 文件读取）
-        DB_USER: ${DB_USER}                              # 数据库用户名（从 .env 文件读取）
-        DB_PASSWORD: ${DB_PASSWORD}                      # 数据库密码（从 .env 文件读取）
+        DB_CLIENT: ${DB_CLIENT}                          # 数据库客户端类型（从 .env 读取）
+        DB_HOST: ${DB_HOST}                              # 数据库主机名（从 .env 读取）
+        DB_PORT: ${DB_PORT}                              # 数据库端口（从 .env 读取）
+        DB_NAME: ${DB_NAME}                              # 数据库名称（从 .env 读取）
+        DB_USER: ${DB_USER}                              # 数据库用户名（从 .env 读取）
+        DB_PASSWORD: ${DB_PASSWORD}                      # 数据库密码（从 .env 读取）
 
         # === 缓存配置 ===
-        REDIS_ENABLED: true                              # 启用 Redis 缓存
-        REDIS_HOST: redis                                # Redis 主机名（容器名）
-        REDIS_PORT: 6379                                 # Redis 端口
+        REDIS_ENABLED: ${REDIS_ENABLED}                  # 启用 Redis 缓存（从 .env 读取）
+        REDIS_HOST: ${REDIS_HOST}                        # Redis 主机名（从 .env 读取）
+        REDIS_PORT: ${REDIS_PORT}                        # Redis 端口（从 .env 读取）
 
         # === 应用核心配置 ===
-        JWT_SECRET: ${JWT_SECRET}                        # JWT 签名密钥（必须设置）
-        SITE_NAME: ${SITE_NAME:-Kutt}                    # 网站名称，默认为 Kutt
-        DEFAULT_DOMAIN: ${DEFAULT_DOMAIN:-short.pianlab.team}  # 默认域名，请修改为你的域名
-        PORT: ${PORT:-3000}                              # 应用内部端口，默认 3000
+        JWT_SECRET: ${JWT_SECRET}                        # JWT 签名密钥（从 .env 读取）
+        SITE_NAME: ${SITE_NAME}                          # 网站名称（从 .env 读取）
+        DEFAULT_DOMAIN: ${DEFAULT_DOMAIN}                # 默认域名（从 .env 读取）
+        PORT: ${PORT}                                    # 应用内部端口（从 .env 读取）
 
         # === 功能控制配置 ===
-        DISALLOW_REGISTRATION: ${DISALLOW_REGISTRATION:-false}      # 是否禁用用户注册
-        DISALLOW_ANONYMOUS_LINKS: ${DISALLOW_ANONYMOUS_LINKS:-false} # 是否禁用匿名创建链接
+        DISALLOW_REGISTRATION: ${DISALLOW_REGISTRATION}          # 是否禁用用户注册（从 .env 读取）
+        DISALLOW_ANONYMOUS_LINKS: ${DISALLOW_ANONYMOUS_LINKS}    # 是否禁用匿名创建链接（从 .env 读取）
 
         # === 网络和安全配置 ===
-        TRUST_PROXY: ${TRUST_PROXY:-true}               # 信任代理服务器（用于获取真实 IP）
-        CUSTOM_DOMAIN_USE_HTTPS: ${CUSTOM_DOMAIN_USE_HTTPS:-true}   # 自定义域名使用 HTTPS
+        TRUST_PROXY: ${TRUST_PROXY}                     # 信任代理服务器（从 .env 读取）
+        CUSTOM_DOMAIN_USE_HTTPS: ${CUSTOM_DOMAIN_USE_HTTPS}     # 自定义域名使用 HTTPS（从 .env 读取）
     # 端口映射：主机端口:容器端口
     ports:
-      - "10086:3000"  # 将容器的 3000 端口映射到主机的 10086 端口
+      - "${HOST_PORT}:${CONTAINER_PORT}"                 # 端口映射（从 .env 读取）
     # 服务依赖关系
     depends_on:
       postgres:
@@ -53,11 +53,11 @@ services:
         condition: service_started  # 等待 Redis 启动完成
   # PostgreSQL 数据库服务
   postgres:
-    container_name: kutt-postgres
-    # 使用官方 PostgreSQL 镜像（最新稳定版）
-    image: postgres:17-alpine
+    container_name: ${POSTGRES_CONTAINER_NAME}           # 容器名称（从 .env 读取）
+    # 使用官方 PostgreSQL 镜像，版本可在 .env 中配置
+    image: ${POSTGRES_IMAGE}                             # 镜像名称（从 .env 读取）
     # 容器异常退出时自动重启
-    restart: always
+    restart: ${RESTART_POLICY}                           # 重启策略（从 .env 读取）
     # 数据卷挂载 - 持久化数据库数据
     volumes:
       # PostgreSQL 数据文件持久化存储
@@ -65,45 +65,45 @@ services:
       - ./data/postgres:/var/lib/postgresql/data
     # 数据库环境变量配置
     environment:
-      POSTGRES_DB: ${DB_NAME}          # 创建的数据库名称
-      POSTGRES_USER: ${DB_USER}        # 数据库用户名
-      POSTGRES_PASSWORD: ${DB_PASSWORD} # 数据库密码
+      POSTGRES_DB: ${DB_NAME}                            # 创建的数据库名称（从 .env 读取）
+      POSTGRES_USER: ${DB_USER}                          # 数据库用户名（从 .env 读取）
+      POSTGRES_PASSWORD: ${DB_PASSWORD}                  # 数据库密码（从 .env 读取）
       # 设置数据库字符编码为 UTF-8
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS}      # 初始化参数（从 .env 读取）
     # 仅在容器网络内暴露端口（不映射到主机）
     expose:
-      - "5432"
+      - "${DB_PORT}"                                     # 数据库端口（从 .env 读取）
     # 健康检查配置
     healthcheck:
       # 检查数据库是否准备就绪
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s    # 每 10 秒检查一次
-      timeout: 5s      # 超时时间 5 秒
-      retries: 5       # 最多重试 5 次
-      start_period: 30s # 启动后等待 30 秒再开始健康检查
+      interval: ${POSTGRES_HEALTH_INTERVAL}              # 健康检查间隔（从 .env 读取）
+      timeout: ${POSTGRES_HEALTH_TIMEOUT}               # 超时时间（从 .env 读取）
+      retries: ${POSTGRES_HEALTH_RETRIES}               # 重试次数（从 .env 读取）
+      start_period: ${POSTGRES_HEALTH_START_PERIOD}     # 启动等待时间（从 .env 读取）
   # Redis 缓存服务
   redis:
-    container_name: kutt-redis
-    # 使用官方 Redis Alpine 镜像（体积小，性能好）
-    image: redis:7-alpine
+    container_name: ${REDIS_CONTAINER_NAME}              # 容器名称（从 .env 读取）
+    # 使用官方 Redis Alpine 镜像，版本可在 .env 中配置
+    image: ${REDIS_IMAGE}                                # 镜像名称（从 .env 读取）
     # 容器异常退出时自动重启
-    restart: always
+    restart: ${RESTART_POLICY}                           # 重启策略（从 .env 读取）
     # Redis 启动命令配置
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: ${REDIS_COMMAND}                            # Redis 启动命令（从 .env 读取）
     # 数据卷挂载 - 持久化缓存数据
     volumes:
       # Redis 数据文件持久化存储（AOF 和 RDB 文件）
       - ./data/redis:/data
     # 仅在容器网络内暴露端口（不映射到主机）
     expose:
-      - "6379"
+      - "${REDIS_PORT}"                                  # Redis 端口（从 .env 读取）
     # 健康检查配置
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s    # 每 10 秒检查一次
-      timeout: 3s      # 超时时间 3 秒
-      retries: 3       # 最多重试 3 次
-      start_period: 10s # 启动后等待 10 秒再开始健康检查
+      interval: ${REDIS_HEALTH_INTERVAL}                 # 健康检查间隔（从 .env 读取）
+      timeout: ${REDIS_HEALTH_TIMEOUT}                  # 超时时间（从 .env 读取）
+      retries: ${REDIS_HEALTH_RETRIES}                  # 重试次数（从 .env 读取）
+      start_period: ${REDIS_HEALTH_START_PERIOD}        # 启动等待时间（从 .env 读取）
 
 # 数据卷定义
 volumes:
@@ -111,8 +111,8 @@ volumes:
   custom:
     driver: local
 
-# 网络配置（使用默认网络）
+# 网络配置
 networks:
   default:
-    name: kutt_network
-    driver: bridge
+    name: ${NETWORK_NAME}                                # 网络名称（从 .env 读取）
+    driver: ${NETWORK_DRIVER}                            # 网络驱动（从 .env 读取）

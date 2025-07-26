@@ -192,15 +192,33 @@ vim .env
 
 **完整的 `.env` 配置示例：**
 
+> **💡 提示**：现在所有配置参数都在 `.env` 文件中，包括 Docker 镜像版本、容器名称、健康检查参数等，使配置更加灵活和可维护。
+
 ```bash
 # ===== 核心配置（必须修改） =====
 # JWT 签名密钥 - 用于用户认证，必须设置为长随机字符串
 JWT_SECRET=your-very-long-random-secret-string-at-least-32-characters
 
+# ===== 数据库配置 =====
 # PostgreSQL 数据库配置
+DB_CLIENT=pg                          # 数据库客户端类型：PostgreSQL
+DB_HOST=postgres                      # 数据库主机名（容器名）
+DB_PORT=5432                          # 数据库端口
 DB_NAME=kutt                          # 数据库名称
 DB_USER=kutt_user                     # 数据库用户名
 DB_PASSWORD=your-secure-password-123  # 数据库密码（请修改为强密码）
+
+# PostgreSQL 初始化参数
+POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+
+# ===== 缓存配置 =====
+# Redis 缓存配置
+REDIS_ENABLED=true                    # 启用 Redis 缓存
+REDIS_HOST=redis                      # Redis 主机名（容器名）
+REDIS_PORT=6379                       # Redis 端口
+
+# Redis 启动参数
+REDIS_COMMAND=redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
 
 # ===== 应用配置 =====
 # 网站基本信息
@@ -218,9 +236,41 @@ DISALLOW_ANONYMOUS_LINKS=false        # 是否禁用匿名创建链接（true=�
 TRUST_PROXY=true                      # 信任代理服务器（frp 环境必须为 true）
 CUSTOM_DOMAIN_USE_HTTPS=true          # 自定义域名使用 HTTPS（推荐为 true）
 
-# ===== 缓存配置 =====
-# Redis 缓存（提高性能）
-REDIS_ENABLED=true                    # 启用 Redis 缓存（推荐为 true）
+# ===== Docker 配置 =====
+# 容器配置
+KUTT_IMAGE=kutt/kutt:latest           # Kutt 应用镜像
+POSTGRES_IMAGE=postgres:17-alpine     # PostgreSQL 镜像
+REDIS_IMAGE=redis:7-alpine            # Redis 镜像
+
+# 容器名称
+KUTT_CONTAINER_NAME=kutt-server       # Kutt 应用容器名
+POSTGRES_CONTAINER_NAME=kutt-postgres # PostgreSQL 容器名
+REDIS_CONTAINER_NAME=kutt-redis       # Redis 容器名
+
+# 端口映射
+HOST_PORT=10086                       # 主机端口（外部访问端口）
+CONTAINER_PORT=3000                   # 容器内部端口
+
+# 重启策略
+RESTART_POLICY=always                 # 容器重启策略
+
+# ===== 网络配置 =====
+# Docker 网络
+NETWORK_NAME=kutt_network             # Docker 网络名称
+NETWORK_DRIVER=bridge                 # 网络驱动类型
+
+# ===== 健康检查配置 =====
+# PostgreSQL 健康检查
+POSTGRES_HEALTH_INTERVAL=10s          # 健康检查间隔
+POSTGRES_HEALTH_TIMEOUT=5s            # 健康检查超时
+POSTGRES_HEALTH_RETRIES=5             # 健康检查重试次数
+POSTGRES_HEALTH_START_PERIOD=30s      # 启动等待时间
+
+# Redis 健康检查
+REDIS_HEALTH_INTERVAL=10s             # 健康检查间隔
+REDIS_HEALTH_TIMEOUT=3s               # 健康检查超时
+REDIS_HEALTH_RETRIES=3                # 健康检查重试次数
+REDIS_HEALTH_START_PERIOD=10s         # 启动等待时间
 
 # ===== 可选配置 =====
 # 短链接自定义
@@ -261,6 +311,32 @@ LINK_LENGTH=6                         # 短链接长度（默认 6 位）
    - 数据库密码至少 12 位，包含大小写字母、数字和特殊字符
    - 生产环境建议设置 `DISALLOW_REGISTRATION=true`
    - 定期更换 JWT_SECRET（需要重新登录所有用户）
+
+4. **配置灵活性**：
+   - **镜像版本控制**：可通过 `KUTT_IMAGE`、`POSTGRES_IMAGE`、`REDIS_IMAGE` 指定具体版本
+   - **端口自定义**：通过 `HOST_PORT` 和 `CONTAINER_PORT` 自定义端口映射
+   - **容器名称**：通过 `*_CONTAINER_NAME` 变量自定义容器名称
+   - **健康检查调优**：可调整健康检查的间隔、超时和重试次数
+   - **Redis 参数**：通过 `REDIS_COMMAND` 自定义 Redis 启动参数
+
+5. **高级配置示例**：
+
+   ```bash
+   # 使用特定版本的镜像
+   KUTT_IMAGE=kutt/kutt:2.7.4
+   POSTGRES_IMAGE=postgres:15-alpine
+   REDIS_IMAGE=redis:6-alpine
+
+   # 自定义端口（避免冲突）
+   HOST_PORT=8080
+
+   # 调整健康检查（适应慢速环境）
+   POSTGRES_HEALTH_START_PERIOD=60s
+   POSTGRES_HEALTH_INTERVAL=30s
+
+   # Redis 内存优化（适应小内存环境）
+   REDIS_COMMAND=redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+   ```
 
 #### 3. 配置 frpc（内网穿透）
 
