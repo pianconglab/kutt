@@ -1,44 +1,59 @@
 services:
   server:
-    build:
-      context: .
+    container_name: kutt-server
+    image: kutt/kutt:latest
+    restart: always
     volumes:
-      - custom:/kutt/custom
+      - ./data/custom:/kutt/custom
     environment:
         DB_CLIENT: pg
         DB_HOST: postgres
         DB_PORT: 5432
+        DB_NAME: ${DB_NAME}
+        DB_USER: ${DB_USER}
+        DB_PASSWORD: ${DB_PASSWORD}
         REDIS_ENABLED: true
         REDIS_HOST: redis
         REDIS_PORT: 6379
+        JWT_SECRET: ${JWT_SECRET}
+        SITE_NAME: ${SITE_NAME:-Kutt}
+        DEFAULT_DOMAIN: ${DEFAULT_DOMAIN:-short.nanye.site}
+        PORT: ${PORT:-3000}
+        DISALLOW_REGISTRATION: ${DISALLOW_REGISTRATION:-false}
+        DISALLOW_ANONYMOUS_LINKS: ${DISALLOW_ANONYMOUS_LINKS:-false}
+        TRUST_PROXY: ${TRUST_PROXY:-true}
+        CUSTOM_DOMAIN_USE_HTTPS: ${CUSTOM_DOMAIN_USE_HTTPS:-true}
     ports:
-      - 3000:3000
+      - 10086:3000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
   postgres:
+    container_name: kutt-postgres
     image: postgres
     restart: always
-    user: ${DB_USER}
     volumes:
-      - db_data_pg:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD} 
     expose:
       - 5432
     healthcheck:
-      test: [ "CMD", "pg_isready" ]
+      test: [ "CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}" ]
       interval: 10s
       timeout: 5s
       retries: 5
   redis:
+    container_name: kutt-redis
     image: redis:alpine
     restart: always
+    volumes:
+      - ./data/redis:/data
     expose:
       - 6379
 volumes:
-  db_data_pg:
   custom:
