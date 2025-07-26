@@ -98,18 +98,56 @@ docker compose up
 
 ### 📋 前置要求
 
-1. **本地主机**：安装 Docker 和 Docker Compose（无需安装 Node.js 或其他依赖）
+1. **本地主机**：
+   - 安装 Docker（版本 20.10 或以上）
+   - 安装 Docker Compose（版本 2.0 或以上）
+   - 至少 2GB 可用磁盘空间（用于数据持久化）
+   - 无需安装 Node.js、PostgreSQL、Redis 等依赖
+
 2. **云服务器**：运行 frps 服务
+
 3. **域名**：已解析到云服务器 IP
+
 4. **frp 客户端**：本地主机运行 frpc
 
 > **✨ 优势**：使用官方 Docker 镜像部署，环境隔离，依赖管理简单，一键启动。
+
+### 💾 数据持久化说明
+
+本部署方案会在项目目录下创建 `data/` 文件夹来持久化所有重要数据：
+
+```text
+kutt-deploy/
+├── docker-compose.postgres.yml    # Docker 编排文件
+├── .env                           # 环境变量配置
+└── data/                          # 数据持久化目录
+    ├── postgres/                  # PostgreSQL 数据库文件
+    │   ├── base/                  # 数据库表空间
+    │   ├── global/                # 全局数据
+    │   ├── pg_wal/                # 事务日志
+    │   └── ...                    # 其他数据库文件
+    ├── redis/                     # Redis 缓存数据文件
+    │   ├── appendonly.aof         # AOF 持久化文件
+    │   └── dump.rdb               # RDB 快照文件
+    └── custom/                    # 自定义文件（主题、样式等）
+        ├── css/                   # 自定义 CSS 文件
+        ├── images/                # 自定义图片文件
+        └── views/                 # 自定义模板文件
+```
+
+> **⚠️ 重要提醒**：
+>
+> - `data/postgres/` 包含所有短链接数据，删除将导致数据永久丢失
+> - `data/redis/` 包含缓存数据，删除会影响性能但不会丢失核心数据
+> - 建议定期备份 `data/` 目录
 
 ### 🚀 部署步骤
 
 #### 1. 准备部署文件
 
-创建项目目录并下载配置文件：
+**方式一：快速部署（推荐）**
+
+创建项目目录并下载必要的配置文件：
 
 ```bash
 # 创建项目目录
@@ -121,48 +159,108 @@ wget https://raw.githubusercontent.com/thedevs-network/kutt/main/docker-compose.
 
 # 下载环境变量示例文件
 wget https://raw.githubusercontent.com/thedevs-network/kutt/main/.example.env -O .env
+
+# 创建数据持久化目录
+mkdir -p data/{postgres,redis,custom}
+
+# 查看目录结构
+tree . || ls -la
 ```
 
-或者，如果你想要自定义配置，也可以克隆完整仓库：
+**方式二：完整克隆（用于自定义开发）**
+
+如果你需要自定义代码或主题：
 
 ```bash
 git clone https://github.com/thedevs-network/kutt.git
 cd kutt
+
+# 创建数据持久化目录（如果不存在）
+mkdir -p data/{postgres,redis,custom}
 ```
 
 #### 2. 配置环境变量
 
-创建 `.env` 文件（基于 `.example.env`）：
+编辑 `.env` 文件，配置必要的环境变量：
 
 ```bash
-# 必需的环境变量
-JWT_SECRET=your-very-long-random-secret-string-here
-
-# PostgreSQL 数据库配置
-DB_PASSWORD=your-secure-database-password
-DB_NAME=kutt
-DB_USER=kutt_user
-
-# Redis 配置
-REDIS_ENABLED=true
-
-# 应用配置 - 重要：修改为你的域名
-SITE_NAME=Kutt
-DEFAULT_DOMAIN=short.your-domain.com  # 修改为你的短链接域名
-PORT=3000
-DISALLOW_REGISTRATION=false
-DISALLOW_ANONYMOUS_LINKS=false
-
-# 代理和安全配置
-TRUST_PROXY=true
-CUSTOM_DOMAIN_USE_HTTPS=true
+# 使用你喜欢的编辑器打开 .env 文件
+nano .env
+# 或者
+vim .env
 ```
 
-**⚠️ 必须修改的配置项：**
+**完整的 `.env` 配置示例：**
 
-- `JWT_SECRET`: 生成一个长随机字符串
-- `DB_PASSWORD`: 设置安全的数据库密码
-- `DEFAULT_DOMAIN`: 修改为你的短链接域名
+```bash
+# ===== 核心配置（必须修改） =====
+# JWT 签名密钥 - 用于用户认证，必须设置为长随机字符串
+JWT_SECRET=your-very-long-random-secret-string-at-least-32-characters
+
+# PostgreSQL 数据库配置
+DB_NAME=kutt                          # 数据库名称
+DB_USER=kutt_user                     # 数据库用户名
+DB_PASSWORD=your-secure-password-123  # 数据库密码（请修改为强密码）
+
+# ===== 应用配置 =====
+# 网站基本信息
+SITE_NAME=Kutt                        # 网站名称，显示在页面标题
+DEFAULT_DOMAIN=short.your-domain.com  # 🔴 重要：修改为你的实际域名
+PORT=3000                             # 应用内部端口（通常不需要修改）
+
+# ===== 功能控制 =====
+# 用户注册和链接创建控制
+DISALLOW_REGISTRATION=false           # 是否禁用新用户注册（true=禁用，false=允许）
+DISALLOW_ANONYMOUS_LINKS=false        # 是否禁用匿名创建链接（true=禁用，false=允许）
+
+# ===== 网络和安全配置 =====
+# 代理和 HTTPS 配置
+TRUST_PROXY=true                      # 信任代理服务器（frp 环境必须为 true）
+CUSTOM_DOMAIN_USE_HTTPS=true          # 自定义域名使用 HTTPS（推荐为 true）
+
+# ===== 缓存配置 =====
+# Redis 缓存（提高性能）
+REDIS_ENABLED=true                    # 启用 Redis 缓存（推荐为 true）
+
+# ===== 可选配置 =====
+# 短链接自定义
+LINK_LENGTH=6                         # 短链接长度（默认 6 位）
+# LINK_CUSTOM_ALPHABET=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+
+# 邮件配置（如果需要邮件功能）
+# MAIL_ENABLED=false
+# MAIL_HOST=smtp.gmail.com
+# MAIL_PORT=587
+# MAIL_USER=your-email@gmail.com
+# MAIL_PASSWORD=your-app-password
+# MAIL_FROM=your-email@gmail.com
+# MAIL_SECURE=false
+```
+
+**🔧 配置说明：**
+
+1. **必须修改的配置**：
+   - `JWT_SECRET`: 生成一个至少 32 位的随机字符串
+   - `DB_PASSWORD`: 设置一个强密码
+   - `DEFAULT_DOMAIN`: 改为你的实际域名（如 `short.nanye.site`）
+
+2. **JWT_SECRET 生成方法**：
+
+   ```bash
+   # 方法一：使用 openssl
+   openssl rand -base64 32
+
+   # 方法二：使用 uuidgen
+   uuidgen | tr -d '-' | head -c 32 && echo
+
+   # 方法三：在线生成
+   # 访问 https://www.random.org/strings/ 生成随机字符串
+   ```
+
+3. **安全建议**：
+   - 数据库密码至少 12 位，包含大小写字母、数字和特殊字符
+   - 生产环境建议设置 `DISALLOW_REGISTRATION=true`
+   - 定期更换 JWT_SECRET（需要重新登录所有用户）
 
 #### 3. 配置 frpc（内网穿透）
 
@@ -179,32 +277,96 @@ remotePort = 10086
 
 #### 4. 启动服务
 
+**步骤详解：**
+
 ```bash
-# 拉取最新的官方镜像（可选，首次运行会自动拉取）
+# 1. 确保在正确的目录中
+pwd  # 应该显示你的项目目录路径
+
+# 2. 检查配置文件是否存在
+ls -la docker-compose.postgres.yml .env
+
+# 3. 拉取最新的官方镜像（推荐）
 docker compose -f docker-compose.postgres.yml pull
 
-# 使用 PostgreSQL + Redis 配置启动
+# 4. 启动所有服务（后台运行）
 docker compose -f docker-compose.postgres.yml up -d
+
+# 5. 查看启动日志（可选）
+docker compose -f docker-compose.postgres.yml logs -f
 ```
 
-**说明**：
+**启动过程说明：**
 
-- 配置文件使用官方 Docker 镜像 `kutt/kutt:latest`
-- 首次启动会自动下载镜像，无需本地构建
-- 数据会持久化到 `./data/` 目录
+1. **镜像下载**：首次运行会下载以下镜像
+   - `kutt/kutt:latest` (~200MB) - Kutt 主应用
+   - `postgres:17-alpine` (~100MB) - PostgreSQL 数据库
+   - `redis:7-alpine` (~30MB) - Redis 缓存
+
+2. **容器启动顺序**：
+   - PostgreSQL 数据库先启动并进行健康检查
+   - Redis 缓存启动
+   - Kutt 应用最后启动（等待数据库就绪）
+
+3. **数据初始化**：
+   - 首次启动会自动创建数据库表结构
+   - 数据持久化到 `./data/` 目录
 
 #### 5. 验证部署
 
+**全面的部署验证步骤：**
+
 ```bash
-# 检查容器状态
+# 1. 检查所有容器状态
 docker compose -f docker-compose.postgres.yml ps
+# 期望输出：所有容器状态为 "Up" 或 "Up (healthy)"
 
-# 检查服务健康状态
+# 2. 检查各个服务的健康状态
+echo "=== 检查 Kutt 应用 ==="
+curl -I http://localhost:10086
+# 期望输出：HTTP/1.1 200 OK
+
+echo "=== 检查 API 健康端点 ==="
 curl http://localhost:10086/api/v2/health
+# 期望输出：OK
 
-# 查看日志
-docker compose -f docker-compose.postgres.yml logs -f
+echo "=== 检查 PostgreSQL ==="
+docker compose -f docker-compose.postgres.yml exec postgres pg_isready -U kutt_user -d kutt
+# 期望输出：accepting connections
+
+echo "=== 检查 Redis ==="
+docker compose -f docker-compose.postgres.yml exec redis redis-cli ping
+# 期望输出：PONG
+
+# 3. 检查端口监听
+netstat -tlnp | grep 10086
+# 期望输出：显示 10086 端口被监听
+
+# 4. 查看实时日志（可选）
+docker compose -f docker-compose.postgres.yml logs -f --tail=50
 ```
+
+**验证结果判断：**
+
+✅ **部署成功的标志**：
+
+- 所有容器状态为 "Up" 且 PostgreSQL 显示 "healthy"
+- `curl http://localhost:10086` 返回 HTTP 200
+- API 健康检查返回 "OK"
+- 数据库和 Redis 连接正常
+
+❌ **常见问题排查**：
+
+- 如果容器启动失败，检查 `.env` 文件配置
+- 如果端口冲突，修改 docker-compose.yml 中的端口映射
+- 如果数据库连接失败，检查 `DB_PASSWORD` 等数据库配置
+
+**首次访问设置：**
+
+1. 打开浏览器访问 `http://localhost:10086`
+2. 首次访问会提示创建管理员账户
+3. 填写邮箱和密码创建账户
+4. 登录后即可开始使用短链接服务
 
 ### 🔧 云服务器配置
 
@@ -265,14 +427,108 @@ docker compose -f docker-compose.postgres.yml pull
 docker compose -f docker-compose.postgres.yml up -d
 ```
 
-#### 数据备份
+#### 数据备份与恢复
+
+**📦 完整备份方案**
 
 ```bash
-# 备份数据库
-docker compose -f docker-compose.postgres.yml exec postgres pg_dump -U kutt_user kutt > backup.sql
+# 1. 创建备份目录
+mkdir -p backups/$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
 
-# 备份数据目录
-tar -czf kutt-data-backup.tar.gz data/
+# 2. 备份数据库（SQL 格式）
+echo "正在备份数据库..."
+docker compose -f docker-compose.postgres.yml exec postgres pg_dump -U kutt_user kutt > $BACKUP_DIR/database.sql
+
+# 3. 备份数据库（自定义格式，支持并行恢复）
+docker compose -f docker-compose.postgres.yml exec postgres pg_dump -U kutt_user -Fc kutt > $BACKUP_DIR/database.dump
+
+# 4. 备份整个数据目录
+echo "正在备份数据目录..."
+tar -czf $BACKUP_DIR/data-full-backup.tar.gz data/
+
+# 5. 备份配置文件
+cp .env $BACKUP_DIR/
+cp docker-compose.postgres.yml $BACKUP_DIR/
+
+# 6. 创建备份信息文件
+echo "备份时间: $(date)" > $BACKUP_DIR/backup-info.txt
+echo "Kutt 版本: $(docker compose -f docker-compose.postgres.yml exec server cat /kutt/package.json | grep version)" >> $BACKUP_DIR/backup-info.txt
+echo "数据库大小: $(du -sh data/postgres)" >> $BACKUP_DIR/backup-info.txt
+
+echo "备份完成，保存在: $BACKUP_DIR"
+```
+
+**🔄 数据恢复方案**
+
+```bash
+# 1. 停止服务
+docker compose -f docker-compose.postgres.yml down
+
+# 2. 恢复数据目录（完整恢复）
+rm -rf data/  # ⚠️ 危险操作，确保有备份
+tar -xzf backups/20240101_120000/data-full-backup.tar.gz
+
+# 3. 或者仅恢复数据库
+# 启动数据库服务
+docker compose -f docker-compose.postgres.yml up -d postgres
+
+# 等待数据库启动
+sleep 30
+
+# 恢复数据库（从 SQL 文件）
+docker compose -f docker-compose.postgres.yml exec -T postgres psql -U kutt_user -d kutt < backups/20240101_120000/database.sql
+
+# 或者恢复数据库（从 dump 文件）
+docker compose -f docker-compose.postgres.yml exec postgres pg_restore -U kutt_user -d kutt -c /tmp/database.dump
+
+# 4. 启动所有服务
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+**⏰ 自动备份脚本**
+
+创建自动备份脚本 `backup.sh`：
+
+```bash
+#!/bin/bash
+# Kutt 自动备份脚本
+
+# 配置
+KUTT_DIR="/path/to/your/kutt-deploy"  # 修改为你的实际路径
+BACKUP_ROOT="/path/to/backups"        # 修改为你的备份目录
+KEEP_DAYS=30                          # 保留备份天数
+
+cd $KUTT_DIR
+
+# 创建备份目录
+BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d_%H%M%S)"
+mkdir -p $BACKUP_DIR
+
+# 备份数据库
+docker compose -f docker-compose.postgres.yml exec postgres pg_dump -U kutt_user -Fc kutt > $BACKUP_DIR/database.dump
+
+# 备份配置文件
+cp .env docker-compose.postgres.yml $BACKUP_DIR/
+
+# 压缩备份
+tar -czf $BACKUP_DIR.tar.gz -C $BACKUP_ROOT $(basename $BACKUP_DIR)
+rm -rf $BACKUP_DIR
+
+# 清理旧备份
+find $BACKUP_ROOT -name "*.tar.gz" -mtime +$KEEP_DAYS -delete
+
+echo "备份完成: $BACKUP_DIR.tar.gz"
+```
+
+**设置定时备份（crontab）**：
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加以下行（每天凌晨 2 点备份）
+0 2 * * * /path/to/backup.sh >> /var/log/kutt-backup.log 2>&1
 ```
 
 ### 🔍 故障排除
