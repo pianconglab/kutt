@@ -22,7 +22,12 @@ class CustomError extends Error {
   }
 }
 
-const urlRegex = /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9\u00a1-\uffff][a-z0-9\u00a1-\uffff_-]{0,62})?[a-z0-9\u00a1-\uffff]\.)+(?:[a-z\u00a1-\uffff]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i;
+// URL 验证正则表达式 - 根据环境变量决定是否允许私有 IP
+const urlRegexWithPrivateIPs = /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:(?:[a-z0-9\u00a1-\uffff][a-z0-9\u00a1-\uffff_-]{0,62})?[a-z0-9\u00a1-\uffff]\.)+(?:[a-z\u00a1-\uffff]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i;
+const urlRegexWithoutPrivateIPs = /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9\u00a1-\uffff][a-z0-9\u00a1-\uffff_-]{0,62})?[a-z0-9\u00a1-\uffff]\.)+(?:[a-z\u00a1-\uffff]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i;
+
+// 根据环境变量选择合适的正则表达式
+const urlRegex = env.ALLOW_PRIVATE_IPS === true ? urlRegexWithPrivateIPs : urlRegexWithoutPrivateIPs;
 
 const charsNeedEscapeInRegExp = ".$*+?()[]{}|^-";
 const customAlphabetEscaped = env.LINK_CUSTOM_ALPHABET
@@ -36,14 +41,14 @@ function isAdmin(user) {
 
 function signToken(user) {
   return JWT.sign(
-      {
-        iss: "ApiAuth",
-        sub: user.id,
-        iat: parseInt((new Date().getTime() / 1000).toFixed(0)),
-        exp: parseInt((addDays(new Date(), 7).getTime() / 1000).toFixed(0))
-      },
-      env.JWT_SECRET
-    )
+    {
+      iss: "ApiAuth",
+      sub: user.id,
+      iat: parseInt((new Date().getTime() / 1000).toFixed(0)),
+      exp: parseInt((addDays(new Date(), 7).getTime() / 1000).toFixed(0))
+    },
+    env.JWT_SECRET
+  )
 }
 
 function setToken(res, token) {
@@ -87,7 +92,7 @@ function statsObjectToArray(obj) {
         value: obj[key][name]
       }))
       .sort((a, b) => b.value - a.value);
-  
+
   return {
     browser: objToArr("browser"),
     os: objToArr("os"),
@@ -123,12 +128,12 @@ function dateToUTC(date) {
   if (knex.isSQLite) {
     return dateUTC.substring(0, 10) + " " + dateUTC.substring(11, 19);
   }
-  
+
   // mysql doesn't save time in utc, so format the date in local timezone instead
   if (knex.isMySQL) {
     return format(new Date(date), "yyyy-MM-dd HH:mm:ss");
   }
-  
+
   // return unformatted utc string for postgres
   return dateUTC;
 }
@@ -217,11 +222,11 @@ function getInitStats() {
 
 // format date to relative date
 const MINUTE = 60,
-      HOUR = MINUTE * 60,
-      DAY = HOUR * 24,
-      WEEK = DAY * 7,
-      MONTH = DAY * 30,
-      YEAR = DAY * 365;
+  HOUR = MINUTE * 60,
+  DAY = HOUR * 24,
+  WEEK = DAY * 7,
+  MONTH = DAY * 30,
+  YEAR = DAY * 365;
 function getTimeAgo(dateString) {
   const date = new Date(dateString);
   const secondsAgo = Math.round((Date.now() - Number(date)) / 1000);
@@ -341,34 +346,34 @@ function removeWww(host) {
 };
 
 function registerHandlebarsHelpers() {
-  hbs.registerHelper("ifEquals", function(arg1, arg2, options) {
+  hbs.registerHelper("ifEquals", function (arg1, arg2, options) {
     return (arg1 === arg2) ? options.fn(this) : options.inverse(this);
   });
 
-  hbs.registerHelper("json", function(context) {
+  hbs.registerHelper("json", function (context) {
     return JSON.stringify(context);
   });
-  
+
   const blocks = {};
 
-  hbs.registerHelper("extend", function(name, context) {
-      let block = blocks[name];
-      if (!block) {
-          block = blocks[name] = [];
-      }
-      block.push(context.fn(this));
+  hbs.registerHelper("extend", function (name, context) {
+    let block = blocks[name];
+    if (!block) {
+      block = blocks[name] = [];
+    }
+    block.push(context.fn(this));
   });
 
-  hbs.registerHelper("block", function(name) {
-      const val = (blocks[name] || []).join("\n");
-      blocks[name] = [];
-      return val;
+  hbs.registerHelper("block", function (name) {
+    const val = (blocks[name] || []).join("\n");
+    blocks[name] = [];
+    return val;
   });
-  hbs.registerPartials(path.join(__dirname, "../views/partials"), function (err) {});
+  hbs.registerPartials(path.join(__dirname, "../views/partials"), function (err) { });
   const customPartialsPath = path.join(__dirname, "../../custom/views/partials");
   const customPartialsExist = fs.existsSync(customPartialsPath);
   if (customPartialsExist) {
-    hbs.registerPartials(customPartialsPath, function (err) {});
+    hbs.registerPartials(customPartialsPath, function (err) { });
   }
 }
 
@@ -377,11 +382,11 @@ const custom_css_file_names = [];
 const customCSSPath = path.join(__dirname, "../../custom/css");
 const customCSSExists = fs.existsSync(customCSSPath);
 if (customCSSExists) {
-  fs.readdir(customCSSPath, function(error, files) {
+  fs.readdir(customCSSPath, function (error, files) {
     if (error) {
       console.warn("Could not read the custom CSS folder:", error);
     } else {
-      files.forEach(function(file_name) {
+      files.forEach(function (file_name) {
         custom_css_file_names.push(file_name);
       });
     }

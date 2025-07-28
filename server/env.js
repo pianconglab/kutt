@@ -53,6 +53,7 @@ const spec = {
   SERVER_IP_ADDRESS: str({ default: "" }),
   SERVER_CNAME_ADDRESS: str({ default: "" }),
   CUSTOM_DOMAIN_USE_HTTPS: bool({ default: false }),
+  ALLOW_PRIVATE_IPS: bool({ default: false }),
   JWT_SECRET: str({ devDefault: "securekey" }),
   MAIL_ENABLED: bool({ default: false }),
   MAIL_HOST: str({ default: "" }),

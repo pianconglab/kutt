@@ -6,8 +6,12 @@ services:
   # Kutt 主应用服务
   server:
     container_name: ${KUTT_CONTAINER_NAME}               # 容器名称（从 .env 读取）
-    # 使用官方 Docker 镜像，版本可在 .env 中配置
-    image: ${KUTT_IMAGE}                                 # 镜像名称（从 .env 读取）
+    # 使用本地构建（支持 IP 域名的修改版本）
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # 备用：使用官方 Docker 镜像，版本可在 .env 中配置
+    # image: ${KUTT_IMAGE}                                 # 镜像名称（从 .env 读取）
     # 容器异常退出时自动重启
     restart: ${RESTART_POLICY}                           # 重启策略（从 .env 读取）
     # 数据卷挂载 - 持久化自定义文件
@@ -42,6 +46,7 @@ services:
         # === 网络和安全配置 ===
         TRUST_PROXY: ${TRUST_PROXY}                     # 信任代理服务器（从 .env 读取）
         CUSTOM_DOMAIN_USE_HTTPS: ${CUSTOM_DOMAIN_USE_HTTPS}     # 自定义域名使用 HTTPS（从 .env 读取）
+        ALLOW_PRIVATE_IPS: ${ALLOW_PRIVATE_IPS}          # 是否允许私有 IP 地址（从 .env 读取）
     # 端口映射：主机端口:容器端口
     ports:
       - "${HOST_PORT}:${CONTAINER_PORT}"                 # 端口映射（从 .env 读取）
@@ -58,6 +63,8 @@ services:
     image: ${POSTGRES_IMAGE}                             # 镜像名称（从 .env 读取）
     # 容器异常退出时自动重启
     restart: ${RESTART_POLICY}                           # 重启策略（从 .env 读取）
+    # 用户映射：使用当前用户的 UID:GID 避免权限问题
+    user: "${UID:-1000}:${GID:-1000}"
     # 数据卷挂载 - 持久化数据库数据
     volumes:
       # PostgreSQL 数据文件持久化存储
@@ -88,6 +95,8 @@ services:
     image: ${REDIS_IMAGE}                                # 镜像名称（从 .env 读取）
     # 容器异常退出时自动重启
     restart: ${RESTART_POLICY}                           # 重启策略（从 .env 读取）
+    # 用户映射：使用当前用户的 UID:GID 避免权限问题
+    user: "${UID:-1000}:${GID:-1000}"
     # Redis 启动命令配置
     command: ${REDIS_COMMAND}                            # Redis 启动命令（从 .env 读取）
     # 数据卷挂载 - 持久化缓存数据
